@@ -1,210 +1,307 @@
-import numpy as np
 import random
-from copy import deepcopy
-from math import sqrt
-from scipy.stats import f
-from functools import partial
-def lab6():
-    M = 3
-    X1min = -20
-    X1max = 30
-    X2min = 30
-    X2max = 80
-    X3min = 30
-    X3max = 45
-    Matrixplan = [[-1, -1, -1],
-                  [-1, -1, 1],
-                  [-1, 1, -1],
-                  [-1, 1, 1],
-                  [1, -1, -1],
-                  [1, -1, 1],
-                  [1, 1, -1],
-                  [1, 1, 1],
-                  [-1.73, 0, 0],
-                  [1.73, 0, 0],
-                  [0, -1.73, 0],
-                  [0, 1.73, 0],
-                  [0, 0, -1.73],
-                  [0, 0, 1.73],
-                  [0, 0, 0]]
-    def avto_fill_matrix(a):
-        for i in range(len(a)):
-            a[i].append(a[i][0] * a[i][1])
-            a[i].append(a[i][0] * a[i][2])
-            a[i].append(a[i][1] * a[i][2])
-            a[i].append(a[i][0] * a[i][1] * a[i][2])
-            a[i].append(a[i][0] ** 2)
-            a[i].append(a[i][1] ** 2)
-            a[i].append(a[i][2] ** 2)
-        return a
-    def cohren(f1, f2, q=0.05):
-        q1 = q / f1
-        fisher_value = f.ppf(q=1 - q1, dfn=f2, dfd=(f1 - 1) * f2)
-        return fisher_value / (fisher_value + f1 - 1)
-    def fill_matrix(a, x):
-        a1 = []
-        for i in range(len(a)):
-            a1.append([])
-            for j in range(3):
-                a1[i].append(0)
-        for i in range(len(a)):
-            for j in range(3):
-                if a[i][j] == -1:
-                    a1[i][j] = (min(x[j]))
-                elif a[i][j] == 1:
-                    a1[i][j] = (max(x[j]))
-                else:
-                    a1[i][j] = (x[j][0] + x[j][1]) / 2 + a[i][j] * (x[j][1] - ((x[j][0] + x[j][1]) / 2))
-        avto_fill_matrix(a1)
-        return a1
-    def lab(m, plan, natural, ymax, ymin):
-        ysplist = []
-        S2ylist = []
-        S2ysum = 0
-        rl = []
-        yklist = []
-        blist = []
-        detlist = []
-        tlist = []
-        sumt = 0
-        bultlist = []
-        ynewlist = []
-        Sad = 0
-        xlist = ["  ", "*X1", "*X2", "*X3", "*X12", "*X13", "*X23", "*X123", "*X1^2", "*X2^2", "*X3^2"]
-        text3 = "y  = "
-        text4 = "y  = "
-        Gt = cohren(m - 1, 15)
-        for j in range(len(plan)):
-            for i in range(len(plan[14]), m + 10):
-                natural[j].append(random.randint(0, 10) - 5 + 0.7 + 5.4 * natural[j][0] + 4.8 * natural[j][1] + 5.3 * natural[j][2] + 8.1 * natural[j][3] + 0.2 * natural[j][4] + 3.5 * natural[j][5] + 1.9 * natural[j][6])
-                plan[j].append(random.randint(0, 10) - 5 + 0.7 + 5.4 * natural[j][0] + 4.8 * natural[j][1] + 5.3 * natural[j][2] + 8.1 *natural[j][3] + 0.2 * natural[j][4] + 3.5 * natural[j][5] + 1.9 * natural[j][6])
-        for i in range(len(plan)):
-            ysp = 0
-            for j in range(10, len(plan[0])):
-                ysp = ysp + plan[i][j]
-            ysp = ysp / m
-            ysplist.append(ysp)
-        for i in range(len(plan)):
-            S2y = 0
-            for j in range(10, len(plan[0])):
-                S2y = S2y + (plan[i][j] - ysplist[i]) ** 2
-            S2y = S2y / m
-            S2ylist.append(S2y)
-            S2ysum = S2ysum + S2y
-        Gp = max(S2ylist) / S2ysum
-        if Gp > Gt:
-            m = m + 1
-            lab((m, plan, natural, ymax, ymin))
+import numpy as np
+import sklearn.linear_model as lm
+from scipy.stats import f, t
+from prettytable import PrettyTable
+import math
+import time
+
+
+def regression(x, b):
+    y = sum([x[i] * b[i] for i in range(len(x))])
+    return y
+
+
+def dispersion(y, y_aver, n, m):
+    res = []
+    for i in range(n):
+        s = sum([(y_aver[i] - y[i][j]) ** 2 for j in range(m)]) / m
+        res.append(round(s, 3))
+    return res
+
+
+def myVariantY(x1, x2, x3, interaction):
+    result = 0
+    if interaction:
+        result = 0.7 + 5.4 * x1 + 4.8 * x2 + 5.3 * x3 + (8.1 * x1 * x2) + (0.3 * x1 * x3) + (3.5 * x2 * x3) + (
+                    1.9 * x1 * x2 * x3)
+    else:
+        result = 0.7 + 5.4 * x1 + 4.8 * x2 + 5.3 * x3 + (1.1 * x1 * x1) + (0.3 * x2 * x2) + (8.9 * x3 * x3) + (
+                    8.1 * x1 * x2) + (0.3 * x1 * x3) + (3.5 * x2 * x3) + (1.9 * x1 * x2 * x3)
+
+    return round(result, 3)
+
+
+def planing_matrix(n, m, interaction, quadratic_terms):
+    x_normalized = [[1, -1, -1, -1],
+                    [1, -1, 1, 1],
+                    [1, 1, -1, 1],
+                    [1, 1, 1, -1],
+                    [1, -1, -1, 1],
+                    [1, -1, 1, -1],
+                    [1, 1, -1, -1],
+                    [1, 1, 1, 1]]
+
+    if interaction or quadratic_terms:
+        for x in x_normalized:
+            x.append(x[1] * x[2])
+            x.append(x[1] * x[3])
+            x.append(x[2] * x[3])
+            x.append(x[1] * x[2] * x[3])
+
+    l = 1.73
+
+    if quadratic_terms:
+        for row in x_normalized:
+            for i in range(0, 3):
+                row.append(1)
+
+        for i in range(0, 3):
+            row1 = [1]
+            row2 = [1]
+            for _ in range(0, i):
+                row1.append(0)
+                row2.append(0)
+            row1.append(-l)
+            row2.append(l)
+            for _ in range(0, 6):
+                row1.append(0)
+                row2.append(0)
+            row1.append(round(l * l, 3))
+            row2.append(round(l * l, 3))
+            temp = 2 - i
+            for _ in range(0, temp):
+                row1.append(0)
+                row2.append(0)
+            x_normalized.append(row1)
+            x_normalized.append(row2)
+        row15 = []
+        for _ in range(0, 11):
+            row15.append(0)
+        x_normalized.append(row15)
+
+    x_normalized = np.array(x_normalized[:14])
+    x = np.ones(shape=(len(x_normalized), len(x_normalized[0])))
+
+    for i in range(len(x_normalized)):
+        for j in range(1, 4):
+            if x_normalized[i][j] == -1:
+                x[i][j] = x_range[j - 1][0]
+            else:
+                x[i][j] = x_range[j - 1][1]
+    if quadratic_terms:
+        x[8] = [1, -l * delta_x(0) + x_nul(0), x_nul(1), x_nul(2), 1, 1, 1, 1, 1, 1, 1]
+        x[9] = [1, l * delta_x(0) + x_nul(0), x_nul(1), x_nul(2), 1, 1, 1, 1, 1, 1, 1]
+        x[10] = [1, x_nul(0), -l * delta_x(1) + x_nul(1), x_nul(2), 1, 1, 1, 1, 1, 1, 1]
+        x[11] = [1, x_nul(0), l * delta_x(1) + x_nul(1), x_nul(2), 1, 1, 1, 1, 1, 1, 1]
+        x[12] = [1, x_nul(0), x_nul(1), -l * delta_x(2) + x_nul(2), 1, 1, 1, 1, 1, 1, 1]
+        x[13] = [1, x_nul(0), x_nul(1), l * delta_x(2) + x_nul(2), 1, 1, 1, 1, 1, 1, 1]
+
+        for i in range(8, 14):
+            for j in range(0, 11):
+                x[i][j] = round(x[i][j], 3)
+
+    if interaction or quadratic_terms:
+        for i in range(len(x)):
+            x[i][4] = round(x[i][1] * x[i][2], 3)
+            x[i][5] = round(x[i][1] * x[i][3], 3)
+            x[i][6] = round(x[i][2] * x[i][3], 3)
+            x[i][7] = round(x[i][1] * x[i][3] * x[i][2], 3)
+    if quadratic_terms:
+        for i in range(len(x)):
+            x[i][8] = round(x[i][1] * x[i][1], 3)
+            x[i][9] = round(x[i][2] * x[i][2], 3)
+            x[i][10] = round(x[i][3] * x[i][3], 3)
+
+    y = np.zeros(shape=(n, m))
+    for i in range(n):
+        for j in range(m):
+            x1 = x[i][1]
+            x2 = x[i][2]
+            x3 = x[i][3]
+            y[i][j] = myVariantY(x1, x2, x3, interaction) + random.randrange(0, 10) - 5
+
+    if interaction:
+        print(f'\nМатриця планування для n = {n}, m = {m}')
+
+        print('\nЗ кодованими значеннями факторів:')
+        caption = ["X0", "X1", "X2", "X3", "X1X2", "X1X3", "X2X3", "X1X2X3", "Y1", "Y2", "Y3"]
+        rows_kod = np.concatenate((x, y), axis=1)
+        print_table(caption, rows_kod)
+
+        print('\nЗ нормованими значеннями факторів:\n')
+        rows_norm = np.concatenate((x_normalized, y), axis=1)
+        print_table(caption, rows_norm)
+    else:
+        print('\nМатриця планування:')
+        caption = ["X0", "X1", "X2", "X3", "X1X2", "X1X3", "X2X3", "X1X2X3", "X1^2", "X2^2", "X3^2", "Y1", "Y2", "Y3"]
+        rows = np.concatenate((x, y), axis=1)
+        print_table(caption, rows)
+
+    return x, y, x_normalized
+
+
+def x_nul(n):
+    return (x_range[n][0] + x_range[n][1]) / 2
+
+
+def delta_x(n):
+    return x_nul(n) - x_range[n][0]
+
+
+def print_table(caption, values):
+    table = PrettyTable()
+    table.field_names = caption
+
+    for row in values:
+        table.add_row(row)
+    print(table)
+
+def s_kv(y, y_aver, n, m):
+    res = []
+    for i in range(n):
+        s = sum([(y_aver[i] - y[i][j]) ** 2 for j in range(m)]) / m
+        res.append(s)
+    return res
+
+def kriteriy_fishera(y, y_aver, y_new, n, m, d):
+    S_kv_ad = (m / (n - d)) * sum([(y_new[i] - y_aver[i]) ** 2 for i in range(len(y))])
+    S_kv_b = s_kv(y, y_aver, n, m)
+    S_kv_b_aver = sum(S_kv_b) / n
+
+    return S_kv_ad / S_kv_b_aver
+
+
+def check(n, m, interaction, quadratic_terms, iterationNumber):
+    if iterationNumber == maxIterationNumber:
+        print("{} ітерацій виконано. Модель не адекватна.".format(iterationNumber))
+        return True
+
+    f1 = m - 1
+    f2 = n
+    f3 = f1 * f2
+    q = 0.05
+
+    x, y, x_norm = planing_matrix(n, m, interaction, quadratic_terms)
+
+    y_average = [round(sum(i) / len(i), 3) for i in y]
+
+    B = np.linalg.lstsq(x, y_average, rcond=None)[0]
+
+    print('\nСереднє значення y:', y_average)
+
+    dispersion_arr = dispersion(y, y_average, n, m)
+
+    y_perevirka = []
+    list_bi = B
+    x_nat = x
+    for i in range(n):
+        if interaction:
+            y_perevirka.append(
+                list_bi[0] + list_bi[1] * x_nat[i][1] + list_bi[2] * x_nat[i][2] + list_bi[3] * x_nat[i][3] + list_bi[
+                    4] * x_nat[i][4] + list_bi[5] * x_nat[i][5] + list_bi[6] * x_nat[i][6] + list_bi[7] * x_nat[i][7])
         else:
-            deepcool_natural = deepcopy(natural)
-            for i in range(len(deepcool_natural)):
-                deepcool_natural[i].insert(0, 1)
-            for z in range(11):
-                k0l = []
-                for u in range(11):
-                    k0 = 0
-                    for i in range(15):
-                        k0 = k0 + deepcool_natural[i][z] * deepcool_natural[i][u]
-                        k0 = k0
-                    k0l.append(k0)
-                rl.append(k0l)
-            det0 = np.linalg.det(rl)
-            for j in range(11):
-                yk = 0
-                for i in range(15):
-                    yk = yk + ysplist[i] * deepcool_natural[i][j]
-                yklist.append(yk)
-            for j in range(11):
-                v = deepcopy(rl)
-                for i in range(11):
-                    v[i][j] = yklist[i]
-                detlist.append(np.linalg.det(v))
-            for i in range(len(detlist)):
-                blist.append(detlist[i] / det0)
-            S2B = S2ysum / 15
-            S2b = S2B / (15 * m)
-            Sb = sqrt(S2b)
-            plan1 = deepcopy(plan)
-            for i in range(len(plan1)):
-                plan1[i].insert(0, 1)
-            rl = []
-            for z in range(11):
-                k0l = []
-                for u in range(11):
-                    k0 = 0
-                    for i in range(15):
-                        k0 = k0 + plan1[i][z] * plan1[i][u]
-                        k0 = k0
-                    k0l.append(k0)
-                rl.append(k0l)
-            det0 = np.linalg.det(rl)
-            yklist = []
-            for j in range(11):
-                yk = 0
-                for i in range(15):
-                    yk = yk + ysplist[i] * plan1[i][j]
-                yklist.append(yk)
-            detlist = []
-            for j in range(11):
-                v = deepcopy(rl)
-                for i in range(11):
-                    v[i][j] = yklist[i]
-                detlist.append(np.linalg.det(v))
-            for i in range(len(detlist)):
-                tlist.append(abs(detlist[i] / det0) / Sb)
-            for i in range(len(tlist)):
-                if tlist[i] >= 2.042:
-                    bultlist.append(1)
-                    sumt = sumt + 1
-                elif tlist[i] < 2.042:
-                    bultlist.append(0)
-            for j in range(15):
-                ynew = 0
-                for i in range(11):
-                    if bultlist[i] == 1:
-                        ynew = ynew + blist[i] * deepcool_natural[j][i]
-                ynewlist.append(ynew)
-            for i in range(15):
-                Sad = Sad + ((ynewlist[i] - ysplist[i]) ** 2) * m / (15 - sumt)
-            Fp = Sad / S2B
-            for i in range(len(plan)):
-                for j in range(len(plan[i])):
-                    if type(plan[i][j]) == float:
-                        if plan[i][j] != 0:
-                            plan[i][j] = '%.3f' % plan[i][j]
-                        if (plan[i][j] == 0.0 or plan[i][j] == -0.0):
-                            plan[i][j] = 0
-                    plan[i][j] = ('%+6s' % plan[i][j])
-                print(plan[i])
-            blist1 = [str('%.3f' % blist[0]), "  +  " + str('%.3f' % blist[1]), "  +  " + str('%.3f' % blist[2]),
-            "  +  " + str('%.3f' % blist[3]), "  +  " + str('%.3f' % blist[4]), "  +  " + str('%.3f' % blist[5]),
-            "  +  " + str('%.3f' % blist[6]), "  +  " + str('%.3f' % blist[7]), "  +  " + str('%.3f' % blist[8]),
-            "  +  " + str('%.3f' % blist[9]), "  +  " + str('%.3f' % blist[10]), ]
-            for i in range(len(xlist)):
-                text3 = text3 + (blist1[i]) + xlist[i]
-            for i in range(len(xlist)):
-                if bultlist[i] == 1:
-                    text4 = text4 + (blist1[i]) + xlist[i]
-            f4 = 15 - sumt
-            f3 = (m - 1) * 15
-            fisher = partial(f.ppf, q=1 - 0.05)
-            Ft = fisher(dfn=f4, dfd=f3)
-            if Fp < Ft:
-                print("Диспесія  однорідна")
-                print(text3)
-                print(text4)
-                print("Рівняння регресії адекватне оригіналу")
-            elif Fp > Ft:
-                print("Диспесія  однорідна")
-                print(text3)
-                print(text4)
-                print("Рівняння регресії неадекватне оригіналу")
-    def last(X1min, X1max, X2min, X2max, X3min, X3max, M, Matrixplan):
-        xmatrix = [[X1min, X1max], [X2min, X2max], [X3min, X3max]]
-        ymax = 200 + (X3max + X2max + X1max) / 3
-        ymin = 200 + (X3min + X2min + X1min) / 3
-        matrixplan1 = avto_fill_matrix(Matrixplan)
-        matrixnatural = fill_matrix(matrixplan1, xmatrix)
-        lab(M, matrixplan1, matrixnatural, ymax, ymin)
-    last(X1min, X1max, X2min, X2max, X3min, X3max, M, Matrixplan)
-lab6()
+            y_perevirka.append(
+                list_bi[0] + list_bi[1] * x_nat[i][1] + list_bi[2] * x_nat[i][2] + list_bi[3] * x_nat[i][3] + list_bi[
+                    4] * x_nat[i][4] + list_bi[5] * x_nat[i][5] + list_bi[6] * x_nat[i][6] + list_bi[7] * x_nat[i][7] +
+                list_bi[8] *
+                x_nat[i][8] + list_bi[9] * x_nat[i][9] + list_bi[10] * x_nat[i][10])
+
+    print(
+        "\nПеревірка \n   (підставимо значення факторів з матриці планування і порівняємо результат з середніми значеннями функції відгуку за строками):")
+    for i in range(len(y_perevirka)):
+        print(" y{} (перевірка) = {} ≈ {} ".format((i + 1), y_perevirka[i], y_average[i]))
+    print("\nОскільки значення приблизно однакові, то коефіціенти знайдені правильно")
+
+    temp_cohren = f.ppf(q=(1 - q / f1), dfn=f2, dfd=(f1 - 1) * f2)
+    cohren_cr_table = temp_cohren / (temp_cohren + f1 - 1)
+    Gp = max(dispersion_arr) / sum(dispersion_arr)
+
+    print('\nПеревірка за критерієм Кохрена:\n')
+    print(f'Розрахункове значення: Gp = {Gp}'
+          f'\nТабличне значення: Gt = {cohren_cr_table}')
+    if Gp < cohren_cr_table:
+        print(f'З ймовірністю {1 - q} дисперсії однорідні.')
+    else:
+        print("Необхідно збільшити ксть дослідів")
+        m += 1
+        check(n, m, interaction, quadratic_terms, iterationNumber)
+    qq = (1 + 0.95) / 2
+    student_cr_table = t.ppf(df=f3, q=qq)
+
+    Dispersion_B = sum(dispersion_arr) / n
+    Dispersion_beta = Dispersion_B / (m * n)
+    S_beta = math.sqrt(abs(Dispersion_beta))
+
+    student_t = []
+    for i in range(len(B)):
+        student_t.append(round(abs(B[i]) / S_beta, 3))
+
+    print('\nТабличне значення критерій Стьюдента:\n', student_cr_table)
+    print('Розрахункове значення критерій Стьюдента:\n', student_t)
+    res_student_t = [temp for temp in student_t if temp > student_cr_table]
+    final_coefficients = [B[i] for i in range(len(student_t)) if student_t[i] in res_student_t]
+    print('\nКоефіцієнти {} статистично незначущі.'.format(
+        [round(i, 3) for i in B if i not in final_coefficients]))
+
+    y_new = []
+    if interaction:
+        for j in range(n):
+            y_new.append(round(regression([x[j][i] for i in range(len(student_t)) if student_t[i] in res_student_t],
+                                          final_coefficients), 3))
+    else:
+        for j in range(n):
+            y_new.append(round(regression([x[j][i] for i in range(len(student_t)) if student_t[i] in res_student_t],
+                                          final_coefficients), 3))
+
+    print("\nПеревірка при підстановці в спрощене рівняння регресії:")
+    differ = []
+    for i in range(len(y_new)):
+        differ.append(round(abs(y_new[i] - y_average[i]), 3))
+
+    table = PrettyTable()
+    table.add_column("y", y_new)
+    table.add_column("y(середнє)", y_average)
+    table.add_column("Різниця", differ)
+    print(table)
+
+    for i in range(len(final_coefficients)):
+        final_coefficients[i] = round(final_coefficients[i], 3)
+
+    print(f'\nКоефіцієнти рівння регресії: {final_coefficients}')
+    for i in range(len(y_new)):
+        y_new[i] = round(y_new[i], 3)
+
+    d = len(res_student_t)
+
+    if d >= n:
+        print('\nF4 <= 0')
+        print('')
+        return
+    f4 = n - d
+    Fp = kriteriy_fishera(y, y_average, y_new, n, m, d)
+    Ft = f.ppf(dfn=f4, dfd=f3, q=1 - 0.05)
+
+    print('\nПеревірка адекватності за критерієм Фішера:\n')
+    print('Розрахункове значення критерія Фішера: Fp =', Fp)
+    print('Табличне значення критерія Фішера: Ft =', Ft)
+    if Fp < Ft:
+        print('Математична модель адекватна експериментальним даним')
+        return True
+    else:
+        print('Математична модель не адекватна експериментальним даним')
+        return False
+
+
+def main(n, m, iterationNumber):
+    iterationNumber += 1
+    if not check(n, m, True, False, iterationNumber):
+        if not check(14, m, False, True, iterationNumber):
+            main(n, m, iterationNumber)
+
+
+if __name__ == '__main__':
+    # Значення за варіантом
+    x_range = ((-20, 30), (30, 80), (30, 45))
+    maxIterationNumber = 20
+    main(8, 3, 0)
